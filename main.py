@@ -2,9 +2,10 @@
 import io
 import numpy as np
 from PIL import Image
-
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from catfaces_demo import (
     load_model, detect_cat_faces, face_to_feature,
@@ -12,23 +13,36 @@ from catfaces_demo import (
 )
 
 # === 🐱 調整辨識靈敏度 ===
-K = 3                   # 比較3個最近的樣本平均距離
-UNKNOWN_THRESHOLD = 0.65  # 提高閾值，越高越嚴格（0.6～0.75之間測試）
-
+K = 3
+UNKNOWN_THRESHOLD = 0.65
 
 app = FastAPI(title="Cat Face ID API", version="1.2")
 
-# 允許前端來源
+# === 🌐 允許前端跨域訪問 ===
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-comments_db = {}  # {"mama": ["留言1"], "tama": ["留言2"]}
+# === 🐾 前端靜態檔案（放在 frontend 資料夾內） ===
+if not os.path.exists("frontend"):
+    os.makedirs("frontend")
 
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
+# === 🏠 首頁（顯示 index.html） ===
+@app.get("/")
+def read_root():
+    index_path = os.path.join("frontend", "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"detail": "frontend/index.html not found"}
+
+# === 🧠 模型與資料 ===
+comments_db = {}  # {"mama": ["留言1"], "tama": ["留言2"]}
 knn, id2name = load_model()
 
 @app.get("/labels")
